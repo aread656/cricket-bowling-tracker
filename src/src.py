@@ -10,13 +10,6 @@ def read_in_video(path):
         exit()
     return vid1
 
-def hsv_stuff(img):
-    hsv = cv.cvtColor(img, cv.COLOR_BGR2HSV)
-    lower = np.array([25,100,100])
-    upper = np.array([40,255,255])
-    hsv_mask = cv.inRange(hsv,lower,upper)
-    return hsv_mask
-
 def convolution2d(img,n=2):
     #provides a 2d convolution with an n*n kernel
     kernel = np.ones((n,n), np.float32)/(n**2)
@@ -49,11 +42,9 @@ def process_video(vid,bkg):
         if not ret: break
         img = cv.resize(img, (720,1280))
         frame = convolution2d(img)
-        #hsv_mask = hsv_stuff(frame)
         frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
         frame = cv.equalizeHist(frame)
         mask = background_subtraction(bkg,frame,3)
-        #mask = cv.bitwise_and(mask,hsv_mask)
         trajectory = cv_blob_detector(mask,detector)
         for i in range(1,len(trajectory)):
             cv.line(img,trajectory[i-1], trajectory[i], (255,255,0), 3)
@@ -71,24 +62,6 @@ def background_subtraction(bkg,img,n=2):
     mask = cv.morphologyEx(mask,cv.MORPH_OPEN,kernel)
     mask = cv.morphologyEx(mask,cv.MORPH_CLOSE,kernel)
     return mask
-
-def contour_detection(img, min_area = 5, max_area = 30):
-    #isolate ball from bkg noise using contours
-    contours,_ = cv.findContours(img,cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
-    trajectory = []
-    for c in contours:
-        area = cv.contourArea(c)
-        if not (min_area < area < max_area):
-            continue
-        (x,y,w,h) = cv.boundingRect(c)
-        cv.rectangle(img, (x,y),(x+w,y+h),(0,255,0),2)
-        M = cv.moments(c)
-        cx = int(M["m10"]/M["m00"])
-        cy = int(M["m01"]/M["m00"])
-        trajectory.append((cx,cy))
-        radius = int(np.sqrt(area/np.pi))
-        cv.circle(img,(cx,cy),radius,(0,0,255),1)
-    return trajectory
 
 def create_cv_blob_detector():
     param = cv.SimpleBlobDetector_Params()
