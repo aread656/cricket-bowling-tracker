@@ -43,6 +43,16 @@ def background_subtraction(bkg,img,n=2):
     mask = cv.morphologyEx(mask,cv.MORPH_CLOSE,kernel)
     return mask
 
+def create_cv_blob_detector():
+    params = cv.SimpleBlobDetector_Params()
+    params.filterByArea = False
+    params.filterByCircularity = True
+    params.minCircularity = 0.8
+    return cv.SimpleBlobDetector_create(params)
+
+def blob_detector():
+    return 0
+
 def process_video(vid,bkg):
     detector = create_cv_blob_detector()
     while True:
@@ -63,16 +73,6 @@ def process_video(vid,bkg):
         cv.imshow("Video",mask)
         if cv.waitKey(1) & 0xFF == ord('q'):
             break
-
-def create_cv_blob_detector():
-    params = cv.SimpleBlobDetector_Params()
-    params.filterByArea = False
-    params.filterByCircularity = True
-    params.minCircularity = 0.8
-    return cv.SimpleBlobDetector_create(params)
-
-def blob_detector():
-    return 0
 
 if __name__ == "__main__":
     vid1 = read_in_video("data/07_02_26_1.mov")
