@@ -1,6 +1,7 @@
 import cv2 as cv
 import numpy as np
 from matplotlib import pyplot as plt
+from delivery import Delivery
 
 def read_in_video(path):
     #reads the selected video
@@ -64,7 +65,7 @@ def blob_detector(img,detector,trajectory_array):
         trajectory_array.append((x,y))
     return [keypoints, trajectory_array]
 
-def main(vid,bkg):
+def process_video(vid,bkg):
     detector = create_cv_blob_detector()
     trajectory = []
     vid.set(cv.CAP_PROP_POS_FRAMES,0)
@@ -97,17 +98,14 @@ def main(vid,bkg):
         cv.imshow("Video",output)
         if cv.waitKey(1) & 0xFF == ord('q'):
             break
+    delivery = Delivery(trajectory)
+    return delivery
 
 if __name__ == "__main__":
-    vid1 = read_in_video("data/07_02_26_1.mov")
+    vid1 = read_in_video("data/07_02_26_2.mov")
     bgr_frame = convolution2d(get_background_image(vid1))
-    main(vid1,bgr_frame)
+    process_video(vid1,bgr_frame)
     #at this stage, video is black/white segmented footage
     #next step is actual detection/labelling
     vid1.release()
     cv.destroyAllWindows()
-
-#Issue1: Splitting video into individual deliveries
-#As the video progresses, include a counter which increments if no detection
-#If last ~10 frames have no detection, split video
-#Continue video when a detection appears again
