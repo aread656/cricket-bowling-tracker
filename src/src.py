@@ -68,12 +68,10 @@ def main(vid,bkg):
     detector = create_cv_blob_detector()
     trajectory = []
     vid.set(cv.CAP_PROP_POS_FRAMES,0)
-    i = 0
     while True:
         ret, img = vid.read()
         #ret is bool for successful frame opening
         if not ret: break
-        i+=1
         #image preprocessing
         img = cv.resize(img, (720,1280))
         hsv = hsv_filter(img)
@@ -94,17 +92,22 @@ def main(vid,bkg):
                                cv.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
         #draw trajectory line
         for i in range(1,len(trajectory)):
-            cv.line(output,trajectory[i-1],trajectory[i],(255,255,0),3)
+            cv.line(output,trajectory[i-1],trajectory[i],(255,255,0),2)
         #show video
         cv.imshow("Video",output)
         if cv.waitKey(1) & 0xFF == ord('q'):
             break
 
 if __name__ == "__main__":
-    vid1 = read_in_video("data/07_02_26_2.mov")
+    vid1 = read_in_video("data/07_02_26_1.mov")
     bgr_frame = convolution2d(get_background_image(vid1))
     main(vid1,bgr_frame)
     #at this stage, video is black/white segmented footage
     #next step is actual detection/labelling
     vid1.release()
     cv.destroyAllWindows()
+
+#Issue1: Splitting video into individual deliveries
+#As the video progresses, include a counter which increments if no detection
+#If last ~10 frames have no detection, split video
+#Continue video when a detection appears again
