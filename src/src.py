@@ -45,39 +45,65 @@ def background_subtraction(bkg,img,n=2):
 
 def create_cv_blob_detector():
     params = cv.SimpleBlobDetector_Params()
-    params.filterByArea = False
-    params.filterByCircularity = True
-    params.minCircularity = 0.8
-    return cv.SimpleBlobDetector_create(params)
+    params.filterByArea = True
+    params.minArea = 5
+    params.maxArea = 200
+    params.filterByColor = True
+    params.blobColor = 255
+    params.filterByCircularity = False
+    #params.minCircularity = 0.6
+    detector = cv.SimpleBlobDetector_create(params)
+    return detector
 
-def blob_detector():
-    return 0
+def blob_detector(img,detector,trajectory_array):
+    keypoints = detector.detect(img)
+    if len(keypoints)>0:
+        kp = keypoints[0]
+        x = int(kp.pt[0])
+        y = int(kp.pt[1])
+        trajectory_array.append((x,y))
+    return [keypoints, trajectory_array]
 
-def process_video(vid,bkg):
+def main(vid,bkg):
     detector = create_cv_blob_detector()
+    trajectory = []
+    vid.set(cv.CAP_PROP_POS_FRAMES,0)
+    i = 0
     while True:
         ret, img = vid.read()
         #ret is bool for successful frame opening
         if not ret: break
+        i+=1
         #image preprocessing
         img = cv.resize(img, (720,1280))
         hsv = hsv_filter(img)
-        frame = convolution2d(img)
-        frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
+        frame = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
+        frame = convolution2d(frame)
         frame = cv.equalizeHist(frame)
         #background subtraction
         mask = background_subtraction(bkg,frame,3)
+        #combine with HSV filter for more effective segmentation
         mask = cv.bitwise_and(hsv,mask)
+        #dilate the segmented areas, as small area may make detection difficult
         kernel = np.ones((3,3),np.uint8)
-        mask = cv.dilate(cv.dilate(mask,kernel),kernel)
-        cv.imshow("Video",mask)
+        mask = cv.dilate(mask,kernel,iterations = 2)
+        #detect blobs using cv.SimpleBlobDetector
+        keypoints,trajectory = blob_detector(mask,detector,trajectory)
+        #draw ball keypoint
+        output = cv.drawKeypoints(img,keypoints,np.array([]),(0,0,255),
+                               cv.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+        #draw trajectory line
+        for i in range(1,len(trajectory)):
+            cv.line(output,trajectory[i-1],trajectory[i],(255,255,0),3)
+        #show video
+        cv.imshow("Video",output)
         if cv.waitKey(1) & 0xFF == ord('q'):
             break
 
 if __name__ == "__main__":
-    vid1 = read_in_video("data/07_02_26_1.mov")
+    vid1 = read_in_video("data/07_02_26_2.mov")
     bgr_frame = convolution2d(get_background_image(vid1))
-    process_video(vid1,bgr_frame)
+    main(vid1,bgr_frame)
     #at this stage, video is black/white segmented footage
     #next step is actual detection/labelling
     vid1.release()
