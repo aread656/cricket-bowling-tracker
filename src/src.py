@@ -65,7 +65,10 @@ def blob_detector(img,detector,trajectory_array):
         trajectory_array.append((x,y))
     return [keypoints, trajectory_array]
 
-def process_video(vid,bkg):
+def trajectory_into_3d():
+    return
+
+def process_video(vid,bkg,plot=False):
     detector = create_cv_blob_detector()
     trajectory = []
     vid.set(cv.CAP_PROP_POS_FRAMES,0)
@@ -98,6 +101,19 @@ def process_video(vid,bkg):
         cv.imshow("Video",output)
         if cv.waitKey(1) & 0xFF == ord('q'):
             break
+    if plot:
+        print(trajectory)
+        xs = [p[0] for p in trajectory]
+        ys = [p[1] for p in trajectory]
+
+        plt.scatter(xs, ys)
+        plt.plot(xs, ys)
+
+        plt.gca().invert_yaxis()
+        plt.xlabel("Distance down pitch")
+        plt.ylabel("Lateral Line")
+        plt.title("Ball trajectory")
+        plt.show()
     delivery = Delivery(trajectory)
     return delivery
 
