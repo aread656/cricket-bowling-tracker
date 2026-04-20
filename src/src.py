@@ -56,48 +56,19 @@ def create_cv_blob_detector():
     detector = cv.SimpleBlobDetector_create(params)
     return detector
 
-def blob_detector(img,detector,trajectory_array,ray_array,f,cx,cy):
+def blob_detector(img,detector,trajectory_array):
     keypoints = detector.detect(img)
     if len(keypoints)>0:
         kp = keypoints[0]
         x = int(kp.pt[0])
         y = int(kp.pt[1])
-        ray = calculate_ray_from_pixels(x,y,f,cx,cy)
-        ray_array.append(ray)
         trajectory_array.append((x,y))
-    return keypoints, trajectory_array, ray_array
-
-#FOV of the camera, (cx,cy), focal length using formula
-
-def projection_3d(rays,C,fps=60):
-    positions = []
-    for index,ray in enumerate(rays):
-        t = index/fps
-        scale = 5+(0.5*t)+(0.5*t**2)
-        B = C+(scale*ray)
-        positions.append(B)
-    return np.array(positions)
-def calculate_ray_from_pixels(x,y,f,cx,cy):
-    xn = (x-cx)/f
-    yn = (y-cy)/f
-    ray = np.array([xn,-yn,1.0])
-    #np.linalg.norm finds the vector size using the passed array
-    #allows camera space direction vector to be returned
-    ray = ray/np.linalg.norm(ray)
-    return ray
-
-def get_setup_variables(width=720,height=1280,fov=70):
-    C = np.array([-1.0,1.0,-12.0])
-    cx,cy = width/2,height/2
-    f = width/(2*np.tan(np.deg2rad(fov)/2))
-    return C,cx,cy,f
+    return keypoints, trajectory_array
 
 def process_video(vid,bkg,plot=False):
     detector = create_cv_blob_detector()
     trajectory = []
-    rays = []
     vid.set(cv.CAP_PROP_POS_FRAMES,0)
-    C,cx,cy,f = get_setup_variables()
     while True:
         ret, img = vid.read()
         #ret is bool for successful frame opening
@@ -116,8 +87,7 @@ def process_video(vid,bkg,plot=False):
         kernel = np.ones((3,3),np.uint8)
         mask = cv.dilate(mask,kernel,iterations = 2)
         #detect blobs using cv.SimpleBlobDetector
-        keypoints,trajectory,rays= blob_detector(mask,detector,trajectory,
-                                             rays,f,cx,cy)
+        keypoints,trajectory= blob_detector(mask,detector,trajectory)
         #draw ball keypoint
         output = cv.drawKeypoints(img,keypoints,np.array([]),(0,0,255),
                                cv.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
@@ -128,7 +98,6 @@ def process_video(vid,bkg,plot=False):
         cv.imshow("Video",output)
         if cv.waitKey(1) & 0xFF == ord('q'):
             break
-    trajectory_3d = projection_3d(rays,C)
     if plot:
         print(trajectory)
         xs = [p[0] for p in trajectory]
@@ -142,8 +111,7 @@ def process_video(vid,bkg,plot=False):
         plt.ylabel("Lateral Line")
         plt.title("Ball trajectory")
         plt.show()
-    delivery = Delivery(trajectory_3d)
-    print(trajectory_3d)
+    delivery = Delivery(trajectory)
     return delivery
 
 if __name__ == "__main__":
