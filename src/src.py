@@ -29,7 +29,7 @@ def get_background_image(vid):
     ret, frame = vid.read()
     assert ret is not False
     frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
-    frame = cv.resize(frame, (720,1280))
+    frame = cv.resize(frame, (1280,720))
     frame = cv.equalizeHist(frame)
     return frame
 
@@ -65,7 +65,7 @@ def blob_detector(img,detector,trajectory_array):
         trajectory_array.append((x,y))
     return keypoints, trajectory_array
 
-def process_video(vid,bkg,plot=False):
+def process_video(vid,bkg,plot=False,show=False):
     detector = create_cv_blob_detector()
     trajectory = []
     vid.set(cv.CAP_PROP_POS_FRAMES,0)
@@ -74,7 +74,7 @@ def process_video(vid,bkg,plot=False):
         #ret is bool for successful frame opening
         if not ret: break
         #image preprocessing
-        img = cv.resize(img, (720,1280))
+        img = cv.resize(img, (1280,720))
         hsv = hsv_filter(img)
         frame = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
         frame = convolution2d(frame)
@@ -95,9 +95,11 @@ def process_video(vid,bkg,plot=False):
         for i in range(1,len(trajectory)):
             cv.line(output,trajectory[i-1],trajectory[i],(255,255,0),2)
         #show video
-        cv.imshow("Video",output)
-        if cv.waitKey(1) & 0xFF == ord('q'):
-            break
+        output = cv.flip(output,1)
+        if show:
+            cv.imshow("Video",output)
+            if cv.waitKey(1) & 0xFF == ord('q'):
+                break
     if plot:
         print(trajectory)
         xs = [p[0] for p in trajectory]
@@ -105,7 +107,7 @@ def process_video(vid,bkg,plot=False):
 
         plt.scatter(xs, ys)
         plt.plot(xs, ys)
-
+        plt.gca().invert_xaxis()
         plt.gca().invert_yaxis()
         plt.xlabel("Distance down pitch")
         plt.ylabel("Lateral Line")
@@ -115,9 +117,9 @@ def process_video(vid,bkg,plot=False):
     return delivery
 
 if __name__ == "__main__":
-    vid1 = read_in_video("data/07_02_26_2.mov")
+    vid1 = read_in_video("data/25_04_26_1/IMG_7053(10).MOV")
     bgr_frame = convolution2d(get_background_image(vid1))
-    process_video(vid1,bgr_frame)
+    process_video(vid1,bgr_frame,True)
     #at this stage, video is black/white segmented footage
     #next step is actual detection/labelling
     vid1.release()
