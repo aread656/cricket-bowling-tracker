@@ -4,6 +4,9 @@ from matplotlib import pyplot as plt
 from delivery import Delivery
 
 class Processor:
+    #/////////////////////////////////
+    #Video I/0
+    #/////////////////////////////////
     def read_in_video(self,path):
         #reads the selected video
         vid1 = cv.VideoCapture(path)
@@ -11,20 +14,6 @@ class Processor:
             print("Error: Video failed to open")
             exit()
         return vid1
-
-    def hsv_filter(self,img):
-        hsv = cv.cvtColor(img, cv.COLOR_BGR2HSV)
-        lower = np.array([0,100,100])
-        upper = np.array([80,255,255])
-        hsv_mask = cv.inRange(hsv,lower,upper)
-        return hsv_mask
-
-    def convolution2d(self,img,n=2):
-        #provides a 2d convolution with an n*n kernel
-        kernel = np.ones((n,n), np.float32)/(n**2)
-        img = cv.filter2D(img,-1,kernel)
-        return img
-
     def get_background_image(self,vid):
         #creates background image and its histogram
         ret, frame = vid.read()
@@ -34,6 +23,23 @@ class Processor:
         frame = cv.equalizeHist(frame)
         return frame
 
+    #///////////////////////////////////
+    #Masks
+    #///////////////////////////////////
+    def sobelEdgeDetection(self,img):
+        Gx = np.array([-1,0,1,-2,0,2,-1,0,1]).reshape([3,3])
+        Gy = np.array([-1,-2,-1,0,0,0,1,2,1]).reshape([3,3])
+        img_float = np.float32(img)
+        edges_x = cv.filter2D(img_float,-1,Gy)
+        edges_y = cv.filter2D(img_float,-1,Gx)
+        magnitudes = cv.magnitude(edges_x,edges_y)
+        return cv.convertScaleAbs(magnitudes)
+    def hsv_filter(self,img):
+        hsv = cv.cvtColor(img, cv.COLOR_BGR2HSV)
+        lower = np.array([0,100,100])
+        upper = np.array([80,255,255])
+        hsv_mask = cv.inRange(hsv,lower,upper)
+        return hsv_mask
     def background_subtraction(self,bkg,img,n=2):
         #use a static background image to detect objects
         #background does not include ball, so all frames
@@ -44,7 +50,33 @@ class Processor:
         mask = cv.morphologyEx(mask,cv.MORPH_OPEN,kernel)
         mask = cv.morphologyEx(mask,cv.MORPH_CLOSE,kernel)
         return mask
-
+    
+    #///////////////////////////////
+    #Preprocessing
+    #///////////////////////////////
+    def gaussianBlur(self,img):
+        kernel = np.array([
+            1,  4,  6,  4,  1,
+            4, 16, 24, 16,  4,
+            6, 24, 36, 24,  6,
+            4, 16, 24, 16,  4,
+            1,  4,  6,  4,  1
+        ], dtype=np.float32).reshape([5,5]) / 256.0
+        return cv.filter2D(img,-1,kernel)
+    def preprocess_image(self,img):
+        frame = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
+        frame = self.gaussianBlur(frame)
+        frame = cv.equalizeHist(frame)
+        return frame
+    def convolution2d(self,img,n=2):
+        #provides a 2d convolution with an n*n kernel
+        kernel = np.ones((n,n), np.float32)/(n**2)
+        img = cv.filter2D(img,-1,kernel)
+        return img
+    
+    #///////////////////////////////
+    #Detection
+    #///////////////////////////////
     def create_cv_blob_detector(self):
         params = cv.SimpleBlobDetector_Params()
         params.filterByArea = True
@@ -56,16 +88,6 @@ class Processor:
         #params.minCircularity = 0.6
         detector = cv.SimpleBlobDetector_create(params)
         return detector
-
-    def transform_trajectory(self,traj):
-        if not traj:
-            return traj
-        xs = [p[0] for p in traj]
-        ys = [p[1] for p in traj]
-        xs = [max(xs) - x for x in xs]
-        ys = [max(ys) - y for y in ys]
-        return list(zip(xs, ys))
-
     def blob_detector(self,img,detector,trajectory_array):
         keypoints = detector.detect(img)
         if len(keypoints)>0:
@@ -75,6 +97,21 @@ class Processor:
             trajectory_array.append((x,y))
         return keypoints, trajectory_array
 
+    #//////////////////////////////
+    #Trajectory
+    #//////////////////////////////
+    def transform_trajectory(self,traj):
+        if not traj:
+            return traj
+        xs = [p[0] for p in traj]
+        ys = [p[1] for p in traj]
+        xs = [max(xs) - x for x in xs]
+        ys = [max(ys) - y for y in ys]
+        return list(zip(xs, ys))
+
+    #///////////////////////////////
+    #Processing Pipeline
+    #///////////////////////////////
     def process_video(self,vid,bkg,plot=False,show=False):
         detector = self.create_cv_blob_detector()
         trajectory = []
@@ -86,9 +123,7 @@ class Processor:
             #image preprocessing
             img = cv.resize(img, (1280,720))
             hsv = self.hsv_filter(img)
-            frame = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
-            frame = self.gaussianBlur(frame)
-            frame = cv.equalizeHist(frame)
+            frame = self.preprocess_image(img)
             #background subtraction
             mask = self.background_subtraction(bkg,frame,3)
             mask = cv.bitwise_and(hsv,mask)
@@ -126,21 +161,3 @@ class Processor:
             plt.show()
         delivery = Delivery(trajectory)
         return delivery
-    
-    def gaussianBlur(self,img):
-        kernel = np.array([
-            1,  4,  6,  4,  1,
-            4, 16, 24, 16,  4,
-            6, 24, 36, 24,  6,
-            4, 16, 24, 16,  4,
-            1,  4,  6,  4,  1
-        ], dtype=np.float32).reshape([5,5]) / 256.0
-        return cv.filter2D(img,-1,kernel)
-    def sobelEdgeDetection(self,img):
-        Gx = np.array([-1,0,1,-2,0,2,-1,0,1]).reshape([3,3])
-        Gy = np.array([-1,-2,-1,0,0,0,1,2,1]).reshape([3,3])
-        img_float = np.float32(img)
-        edges_x = cv.filter2D(img_float,-1,Gy)
-        edges_y = cv.filter2D(img_float,-1,Gx)
-        magnitudes = cv.magnitude(edges_x,edges_y)
-        return cv.convertScaleAbs(magnitudes)
