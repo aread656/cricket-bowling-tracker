@@ -26,7 +26,7 @@ class Processor:
     #///////////////////////////////////
     #Masks
     #///////////////////////////////////
-    def sobelEdgeDetection(self,img):
+    def sobel_mask(self,img):
         Gx = np.array([-1,0,1,-2,0,2,-1,0,1]).reshape([3,3])
         Gy = np.array([-1,-2,-1,0,0,0,1,2,1]).reshape([3,3])
         img_float = np.float32(img)
@@ -34,7 +34,7 @@ class Processor:
         edges_y = cv.filter2D(img_float,-1,Gx)
         magnitudes = cv.magnitude(edges_x,edges_y)
         return cv.convertScaleAbs(magnitudes)
-    def hsv_filter(self,img):
+    def hsv_mask(self,img):
         hsv = cv.cvtColor(img, cv.COLOR_BGR2HSV)
         lower = np.array([0,100,100])
         upper = np.array([80,255,255])
@@ -54,7 +54,7 @@ class Processor:
     #///////////////////////////////
     #Preprocessing
     #///////////////////////////////
-    def gaussianBlur(self,img):
+    def gaussian_blur(self,img):
         kernel = np.array([
             1,  4,  6,  4,  1,
             4, 16, 24, 16,  4,
@@ -65,7 +65,7 @@ class Processor:
         return cv.filter2D(img,-1,kernel)
     def preprocess_image(self,img):
         frame = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
-        frame = self.gaussianBlur(frame)
+        frame = self.gaussian_blur(frame)
         frame = cv.equalizeHist(frame)
         return frame
     def convolution2d(self,img,n=2):
@@ -122,13 +122,13 @@ class Processor:
             if not ret: break
             #image preprocessing
             img = cv.resize(img, (1280,720))
-            hsv = self.hsv_filter(img)
+            hsv = self.hsv_mask(img)
             frame = self.preprocess_image(img)
             #background subtraction
             mask = self.background_subtraction(bkg,frame,3)
             mask = cv.bitwise_and(hsv,mask)
             #sobel edge detection mask
-            sobel = self.sobelEdgeDetection(frame)
+            sobel = self.sobel_mask(frame)
             _,sobel_mask = cv.threshold(sobel,50,255,cv.THRESH_BINARY)
             mask = cv.bitwise_and(sobel_mask,mask)
             #dilate the segmented areas, as small area may make detection difficult
