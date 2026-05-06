@@ -14,8 +14,8 @@ class Processor:
 
     def hsv_filter(self,img):
         hsv = cv.cvtColor(img, cv.COLOR_BGR2HSV)
-        lower = np.array([25,100,100])
-        upper = np.array([40,255,255])
+        lower = np.array([0,100,100])
+        upper = np.array([80,255,255])
         hsv_mask = cv.inRange(hsv,lower,upper)
         return hsv_mask
 
@@ -48,7 +48,7 @@ class Processor:
     def create_cv_blob_detector(self):
         params = cv.SimpleBlobDetector_Params()
         params.filterByArea = True
-        params.minArea = 5
+        params.minArea = 10
         params.maxArea = 200
         params.filterByColor = True
         params.blobColor = 255
@@ -56,6 +56,15 @@ class Processor:
         #params.minCircularity = 0.6
         detector = cv.SimpleBlobDetector_create(params)
         return detector
+
+    def transform_trajectory(self,traj):
+        if not traj:
+            return traj
+        xs = [p[0] for p in traj]
+        ys = [p[1] for p in traj]
+        xs = [max(xs) - x for x in xs]
+        ys = [max(ys) - y for y in ys]
+        return list(zip(xs, ys))
 
     def blob_detector(self,img,detector,trajectory_array):
         keypoints = detector.detect(img)
@@ -65,18 +74,6 @@ class Processor:
             y = int(kp.pt[1])
             trajectory_array.append((x,y))
         return keypoints, trajectory_array
-    
-    def process_trajectory(self,traj):
-        #needs to stop trajectory at when traj has negative x-velocity
-        #work through each value in the array
-        #compare the current value to the previous value
-        #if negative gap, clear the remaining values
-        for v in traj:
-            shortened_traj = []
-            if traj[v] < traj[v-1]:
-                shortened_traj[v] = traj[v]
-            else:
-                return shortened_traj
 
     def process_video(self,vid,bkg,plot=False,show=False):
         detector = self.create_cv_blob_detector()
@@ -90,12 +87,15 @@ class Processor:
             img = cv.resize(img, (1280,720))
             hsv = self.hsv_filter(img)
             frame = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
-            frame = self.convolution2d(frame)
+            frame = self.gaussianBlur(frame)
             frame = cv.equalizeHist(frame)
             #background subtraction
             mask = self.background_subtraction(bkg,frame,3)
-            #combine with HSV filter for more effective segmentation
             mask = cv.bitwise_and(hsv,mask)
+            #sobel edge detection mask
+            sobel = self.sobelEdgeDetection(frame)
+            _,sobel_mask = cv.threshold(sobel,50,255,cv.THRESH_BINARY)
+            mask = cv.bitwise_and(sobel_mask,mask)
             #dilate the segmented areas, as small area may make detection difficult
             kernel = np.ones((3,3),np.uint8)
             mask = cv.dilate(mask,kernel,iterations = 2)
@@ -113,17 +113,34 @@ class Processor:
                 cv.imshow("Video",output)
                 if cv.waitKey(1) & 0xFF == ord('q'):
                     break
+        trajectory = self.transform_trajectory(trajectory)
         if plot:
             print(trajectory)
             xs = [p[0] for p in trajectory]
             ys = [p[1] for p in trajectory]
-            plt.gca().invert_xaxis()
-            plt.gca().invert_yaxis()
             plt.scatter(xs, ys)
             plt.plot(xs, ys)
             plt.xlabel("Distance down pitch")
-            plt.ylabel("Lateral Line")
+            plt.ylabel("Height")
             plt.title("Ball trajectory")
             plt.show()
         delivery = Delivery(trajectory)
         return delivery
+    
+    def gaussianBlur(self,img):
+        kernel = np.array([
+            1,  4,  6,  4,  1,
+            4, 16, 24, 16,  4,
+            6, 24, 36, 24,  6,
+            4, 16, 24, 16,  4,
+            1,  4,  6,  4,  1
+        ], dtype=np.float32).reshape([5,5]) / 256.0
+        return cv.filter2D(img,-1,kernel)
+    def sobelEdgeDetection(self,img):
+        Gx = np.array([-1,0,1,-2,0,2,-1,0,1]).reshape([3,3])
+        Gy = np.array([-1,-2,-1,0,0,0,1,2,1]).reshape([3,3])
+        img_float = np.float32(img)
+        edges_x = cv.filter2D(img_float,-1,Gy)
+        edges_y = cv.filter2D(img_float,-1,Gx)
+        magnitudes = cv.magnitude(edges_x,edges_y)
+        return cv.convertScaleAbs(magnitudes)
