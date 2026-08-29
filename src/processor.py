@@ -1,163 +1,109 @@
 import cv2 as cv
 import numpy as np
 from matplotlib import pyplot as plt
-from delivery import Delivery
 
-class Processor:
-    #/////////////////////////////////
-    #Video I/0
-    #/////////////////////////////////
-    def read_in_video(self,path):
-        #reads the selected video
-        vid1 = cv.VideoCapture(path)
-        if not vid1.isOpened():
-            print("Error: Video failed to open")
-            exit()
-        return vid1
-    def get_background_image(self,vid):
-        #creates background image and its histogram
-        ret, frame = vid.read()
-        assert ret is not False
-        frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
-        frame = cv.resize(frame, (1280,720))
-        frame = cv.equalizeHist(frame)
-        return frame
+def capture_video(path:str) -> cv.VideoCapture:
+    print("video capture begun")
+    video = cv.VideoCapture(path)
+    print("Video Captured")
+    video.set(cv.CAP_PROP_POS_FRAMES,0)
+    return video
 
-    #///////////////////////////////////
-    #Masks
-    #///////////////////////////////////
-    def sobel_mask(self,img):
-        Gx = np.array([-1,0,1,-2,0,2,-1,0,1]).reshape([3,3])
-        Gy = np.array([-1,-2,-1,0,0,0,1,2,1]).reshape([3,3])
-        img_float = np.float32(img)
-        edges_x = cv.filter2D(img_float,-1,Gy)
-        edges_y = cv.filter2D(img_float,-1,Gx)
-        magnitudes = cv.magnitude(edges_x,edges_y)
-        return cv.convertScaleAbs(magnitudes)
-    def hsv_mask(self,img):
+def hsv_mask(img):
         hsv = cv.cvtColor(img, cv.COLOR_BGR2HSV)
-        lower = np.array([0,100,100])
+        lower = np.array([20,100,100])
         upper = np.array([80,255,255])
-        hsv_mask = cv.inRange(hsv,lower,upper)
-        return hsv_mask
-    def background_subtraction(self,bkg,img,n=2):
-        #use a static background image to detect objects
-        #background does not include ball, so all frames
-        #with ball in them shall return a detection
-        difference = cv.absdiff(img,bkg)
-        _,mask = cv.threshold(difference,30,255,cv.THRESH_BINARY)
-        kernel = np.ones((n,n),np.uint8)
-        mask = cv.morphologyEx(mask,cv.MORPH_OPEN,kernel)
-        mask = cv.morphologyEx(mask,cv.MORPH_CLOSE,kernel)
-        return mask
-    
-    #///////////////////////////////
-    #Preprocessing
-    #///////////////////////////////
-    def gaussian_blur(self,img):
-        kernel = np.array([
-            1,  4,  6,  4,  1,
-            4, 16, 24, 16,  4,
-            6, 24, 36, 24,  6,
-            4, 16, 24, 16,  4,
-            1,  4,  6,  4,  1
-        ], dtype=np.float32).reshape([5,5]) / 256.0
-        return cv.filter2D(img,-1,kernel)
-    def preprocess_image(self,img):
-        frame = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
-        frame = self.gaussian_blur(frame)
-        frame = cv.equalizeHist(frame)
-        return frame
-    def convolution2d(self,img,n=2):
-        #provides a 2d convolution with an n*n kernel
-        kernel = np.ones((n,n), np.float32)/(n**2)
-        img = cv.filter2D(img,-1,kernel)
-        return img
-    
-    #///////////////////////////////
-    #Detection
-    #///////////////////////////////
-    def create_cv_blob_detector(self):
-        params = cv.SimpleBlobDetector_Params()
-        params.filterByArea = True
-        params.minArea = 10
-        params.maxArea = 200
-        params.filterByColor = True
-        params.blobColor = 255
-        params.filterByCircularity = False
-        #params.minCircularity = 0.6
-        detector = cv.SimpleBlobDetector_create(params)
-        return detector
-    def blob_detector(self,img,detector,trajectory_array):
-        keypoints = detector.detect(img)
-        if len(keypoints)>0:
-            kp = keypoints[0]
-            x = int(kp.pt[0])
-            y = int(kp.pt[1])
-            trajectory_array.append((x,y))
-        return keypoints, trajectory_array
+        return cv.inRange(hsv,lower,upper)
 
-    #//////////////////////////////
-    #Trajectory
-    #//////////////////////////////
-    def transform_trajectory(self,traj):
-        if not traj:
-            return traj
-        xs = [p[0] for p in traj]
-        ys = [p[1] for p in traj]
-        xs = [max(xs) - x for x in xs]
-        ys = [max(ys) - y for y in ys]
-        return list(zip(xs, ys))
+def find_background_image(vid:cv.VideoCapture):
+    ret, background = vid.read()
+    if not ret:
+        print("No background image. Check file exists, and method called before other processing")
+        return
+    return background
 
-    #///////////////////////////////
-    #Processing Pipeline
-    #///////////////////////////////
-    def process_video(self,vid,bkg,plot=False,show=False):
-        detector = self.create_cv_blob_detector()
-        trajectory = []
-        vid.set(cv.CAP_PROP_POS_FRAMES,0)
-        while True:
-            ret, img = vid.read()
-            #ret is bool for successful frame opening
-            if not ret: break
-            #image preprocessing
-            img = cv.resize(img, (1280,720))
-            hsv = self.hsv_mask(img)
-            frame = self.preprocess_image(img)
-            #background subtraction
-            mask = self.background_subtraction(bkg,frame,3)
-            mask = cv.bitwise_and(hsv,mask)
-            #sobel edge detection mask
-            sobel = self.sobel_mask(frame)
-            _,sobel_mask = cv.threshold(sobel,50,255,cv.THRESH_BINARY)
-            mask = cv.bitwise_and(sobel_mask,mask)
-            #dilate the segmented areas, as small area may make detection difficult
-            kernel = np.ones((3,3),np.uint8)
-            mask = cv.dilate(mask,kernel,iterations = 2)
-            #detect blobs using cv.SimpleBlobDetector
-            keypoints,trajectory= self.blob_detector(mask,detector,trajectory)
-            #draw ball keypoint
-            output = cv.drawKeypoints(img,keypoints,np.array([]),(0,0,255),
-                                cv.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-            #draw trajectory line
-            for i in range(1,len(trajectory)):
-                cv.line(output,trajectory[i-1],trajectory[i],(255,255,0),2)
-            #show video
-            output = cv.flip(output,1)
-            if show:
-                cv.imshow("Video",output)
-                if cv.waitKey(1) & 0xFF == ord('q'):
-                    break
-        trajectory = self.transform_trajectory(trajectory)
-        if plot:
-            print(trajectory)
-            xs = [p[0] for p in trajectory]
-            ys = [p[1] for p in trajectory]
-            plt.scatter(xs, ys)
-            plt.plot(xs, ys)
-            plt.xlabel("Distance down pitch")
-            plt.ylabel("Height")
-            plt.title("Ball trajectory")
-            plt.show()
-        delivery = Delivery(trajectory)
-        return delivery
+def background_subtraction(image,background):
+    background = np.uint8(cv.cvtColor(background,cv.COLOR_BGR2GRAY))
+    image_difference = cv.absdiff(src1 = image, src2 = background)
+    _, segmented_image = cv.threshold(image_difference,30,255,cv.THRESH_BINARY)
+    return segmented_image
+
+def plot_trajectory(trajectory):
+    xs = [p[0] for p in trajectory]
+    ys = [p[1] for p in trajectory]
+
+    plt.figure(figsize=(10,5))
+    plt.scatter(xs,ys,color="red",s=30,label="Ball detections",zorder=3)
+    plt.plot(xs,ys,color="blue",linestyle="--",alpha=0.7,label="Delivery Trajectory")
+    plt.gca().invert_yaxis()
+
+    plt.title("Delivery Trajectory")
+    plt.xlabel("Horizontal distance(pixels)")
+    plt.ylabel("Height")
+    plt.grid(True,linestyle=":",alpha=0.6)
+    plt.legend()
+    plt.show()
+
+def process_video(path):
+    prev_circle = None
+    euclidean_dist = lambda x1,y1,x2,y2: (x1-x2)**2 + (y1-y2)**2
+    trajectory = []
+
+    print("video processing begun")
+    video = capture_video(path)
+
+    background_image = find_background_image(video)
+    print("Background found")
+
+    print("Video imported into processor")
+
+    kernel = np.ones((3,3))
+    stop_counter = 0
+    while stop_counter < 3:
+        ret, frame = video.read()
+        if not ret: break
+
+        grey_frame = cv.cvtColor(frame,cv.COLOR_BGR2GRAY)
+        colour_frame = hsv_mask(frame)
+        #blur_frame = cv.GaussianBlur(src = grey_frame,ksize = (15,15),sigmaX = 0)
+        segmented_frame = background_subtraction(grey_frame,background_image)
+        combined_frame = cv.bitwise_and(segmented_frame,colour_frame)
+        combined_frame = cv.morphologyEx(combined_frame,cv.MORPH_OPEN,kernel)
+        #combined_frame = cv.morphologyEx(combined_frame,cv.MORPH_CLOSE,kernel)
+        _, segmented_frame = cv.threshold(cv.GaussianBlur(combined_frame,(25,25),0),120,255,cv.THRESH_BINARY)
+
+        circles = cv.HoughCircles(image = combined_frame, method = cv.HOUGH_GRADIENT, 
+                                  dp = 1.2, minDist = 100, param1 = 100, param2 = 10,
+                                  minRadius = 0, maxRadius = 15)
+        if circles is not None:
+            circles = np.uint16(np.around(circles))
+            chosen = None
+            for circle in circles[0,:]:
+                if chosen is None:
+                    chosen = circle
+                if prev_circle is not None:
+                    if euclidean_dist(chosen[0],chosen[1],prev_circle[0],prev_circle[1]) >= euclidean_dist(circle[0],circle[1],prev_circle[0],prev_circle[1]):
+                        chosen = circle
+                    # if chosen circle is further to the right and upwards than prev_circle,
+                    # increment stop_counter. Break when stop_counter > 3, reset if false
+                    # further right = chosen[x] > prev[x], chosen[y] < prev[y]
+                    if (chosen[0] > prev_circle[0] and chosen[1] < prev_circle[1]):
+                        stop_counter += 1
+                    else:
+                        stop_counter = 0
+            if chosen is not None:
+                trajectory.append((int(chosen[0]),int(chosen[1])))
+                cv.circle(img = frame, center = (chosen[0],chosen[1]), radius=1, color=(0,100,100),thickness=3)
+                cv.circle(frame,(chosen[0],chosen[1]),chosen[2],(255,0,255),3)
+                prev_circle = chosen
+        cv.imshow("circles",frame)
+
+        if cv.waitKey(1) & 0xFF == ord("q"): break
+    plot_trajectory(trajectory)
+    video.release()
+    cv.destroyAllWindows()
+
+if __name__ == "__main__":
+    path = "data/25_04_26_1/IMG_7053(7).MOV"
+    process_video(path)
+    print("Success")
