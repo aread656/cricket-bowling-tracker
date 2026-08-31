@@ -1,3 +1,0 @@
-# CURRENT STATE(28/3/26):
-The system can take in a video of deliveries and output a trajectory vector from the data it has been passed. It can read in, preprocess, segment, and detect objects in the footage.
-The system currently works best when a video containing a single delivery is passed. When multiple deliveries are in the footage, the footage returns a massive trajectory vector which contains the trajectories for all deliveries. 
