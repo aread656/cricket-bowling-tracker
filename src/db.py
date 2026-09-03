@@ -10,10 +10,10 @@ def init_db():
 
     # create trajectories table
     create_trajectories_table = """CREATE TABLE IF NOT EXISTS
-    trajectories(trajectory_id INTEGER PRIMARY KEY AUTOINCREMENT)"""
+    trajectories(trajectory_id INTEGER PRIMARY KEY)"""
     cursor.execute(create_trajectories_table)
     create_trajectory_points_table = """CREATE TABLE IF NOT EXISTS 
-    trajectory_points(trajectory_points_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    trajectory_points(trajectory_points_id INTEGER PRIMARY KEY,
     trajectory_id INTEGER,
     x REAL,
     y REAL,
@@ -23,7 +23,7 @@ def init_db():
 
     # create deliveries table
     create_deliveries_table = """CREATE TABLE IF NOT EXISTS
-    deliveries(delivery_id INTEGER PRIMARY KEY AUTOINCREMENT, 
+    deliveries(delivery_id INTEGER PRIMARY KEY, 
     trajectory_id INTEGER,
     path TEXT, 
     run_up INTEGER, 
