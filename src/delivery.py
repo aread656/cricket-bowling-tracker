@@ -1,12 +1,12 @@
-import math
 class Delivery:
-    def __init__(self,trajectory,run_up: int = 0,distance: int = 0):
+    def __init__(self,trajectory,fps: float,run_up: int = 0,distance: int = 0):
         self.trajectory = trajectory
+        self.fps = fps
         self.run_up = run_up
         self.distance = distance
-        self.speed = self.calculate_speed(46.12)
-    def calculate_speed(self,fps = 60):
-        frame_duration: float = 1.0/fps
+        self.speed = self.calculate_speed()
+    def calculate_speed(self):
+        frame_duration: float = 1.0/self.fps
         velocities: list[float] = []
         euclidean_distance = lambda x1,x2,y1,y2: ((x1-x2)**2 + (y1-y2)**2)**0.5
         #iterate through all detections, find velocity for each
@@ -17,3 +17,5 @@ class Delivery:
             #velocity = distance over time
             velocities.append(delta_dist/delta_time)
         return sum(velocities)/len(velocities)
+    def __str__(self):
+        return f"Delivery at {self.distance} from a {self.run_up} run-up: {self.speed} m/s"
