@@ -3,7 +3,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 import os
 from delivery import Delivery
-from db import save_delivery_to_db
+from db import save_delivery_to_db, init_db
 
 def capture_video(path:str) -> cv.VideoCapture:
     print("video capture begun")
@@ -133,6 +133,7 @@ def process_video(path, show=False):
     return Delivery(trajectory,fps)
 
 if __name__ == "__main__":
+    init_db()
     path = "data/29_08_26"
     if os.path.isfile(path):
         delivery = process_video(path,True)
