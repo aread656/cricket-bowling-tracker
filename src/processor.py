@@ -3,6 +3,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 import os
 from delivery import Delivery
+from db import save_delivery_to_db
 
 def capture_video(path:str) -> cv.VideoCapture:
     print("video capture begun")
@@ -11,7 +12,7 @@ def capture_video(path:str) -> cv.VideoCapture:
     fps = video.get(cv.CAP_PROP_FPS)
     print("Actual video FPS:", fps)
     video.set(cv.CAP_PROP_POS_FRAMES,0)
-    return video
+    return video, fps
 
 def hsv_mask(img):
         hsv = cv.cvtColor(img, cv.COLOR_BGR2HSV)
@@ -71,7 +72,7 @@ def process_video(path, show=False):
     trajectory: list[(int,int),int] | list[(float,float),int]= []
 
     print("video processing begun")
-    video = capture_video(path)
+    video, fps = capture_video(path)
 
     background_image = find_background_image(video)
     print("Background found")
@@ -126,18 +127,28 @@ def process_video(path, show=False):
     if len(trajectory) < 5:
         return None
     trajectory = convert_to_metres(trajectory)
-    plot_trajectory(trajectory)
+    if show: plot_trajectory(trajectory)
     video.release()
     cv.destroyAllWindows()
-    print(trajectory)
-    return Delivery(trajectory)
+    return Delivery(trajectory,fps)
 
 if __name__ == "__main__":
-    path = "data/29_08_26/IMG_8158(5).MOV"
+    path = "data/29_08_26"
     if os.path.isfile(path):
-        trajectory = process_video(path,True)
-        if trajectory is not None:
-            print(trajectory.speed)
+        delivery = process_video(path,True)
+        if delivery is not None:
+            print(delivery)
+            save_delivery_to_db(delivery,path)
             print("Success")
         else:
             print("Detection inadequate to calculate trajectory")
+    elif os.path.isdir(path):
+        files = [entry.path for entry in os.scandir(path) if os.path.isfile(entry)]
+        for file in files:
+            delivery = process_video(file,False)
+            if delivery is not None:
+                print(delivery)
+                save_delivery_to_db(delivery,file)
+                print("Success")
+            else:
+                print("Detection inadequate to calculate trajectory")
