@@ -1,0 +1,8 @@
+__pycache__
+data
+.vscode
+settings.json
+*.db
+*.sqlite
+*.sqlite3
+*.md
