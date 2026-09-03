@@ -1,11 +1,15 @@
 import cv2 as cv
 import numpy as np
 from matplotlib import pyplot as plt
+import os
+from delivery import Delivery
 
 def capture_video(path:str) -> cv.VideoCapture:
     print("video capture begun")
     video = cv.VideoCapture(path)
     print("Video Captured")
+    fps = video.get(cv.CAP_PROP_FPS)
+    print("Actual video FPS:", fps)
     video.set(cv.CAP_PROP_POS_FRAMES,0)
     return video
 
@@ -28,17 +32,23 @@ def background_subtraction(image,background):
     _, segmented_image = cv.threshold(image_difference,30,255,cv.THRESH_BINARY)
     return segmented_image
 
-def convert_to_metres():
-    return
-
-def plot_trajectory(trajectory,pitch_start_x=200, 
-                    pitch_end_x=1920,pitch_length=12.0):
+def convert_to_metres(trajectory, pitch_start_x=200, pitch_end_x=1920,pitch_length=12.0):
     pixels_to_metres_scale_factor: float = (pitch_length/abs(pitch_end_x-pitch_start_x))
+    # iterate over all coordinate tuples in trajectory list
+    # change each x & y value into metres
+    new_trajectory = []
+    y_ground_level: float = max(point[0][1] for point in trajectory)
+    for point in trajectory:
+        new_x = round((point[0][0]-pitch_start_x)*pixels_to_metres_scale_factor,3)
+        new_y = round((y_ground_level-point[0][1])*pixels_to_metres_scale_factor,3)
+        frame = point[1]
+        new_trajectory.append(((new_x,new_y),frame))
+    return new_trajectory
 
-    xs = [(p[0]-pitch_start_x)*pixels_to_metres_scale_factor for p in trajectory]
+def plot_trajectory(trajectory,pitch_length=12.0):
 
-    y_ground_level: float = max(p[1] for p in trajectory)
-    ys = [(y_ground_level-p[1])*pixels_to_metres_scale_factor for p in trajectory]
+    xs = [p[0][0] for p in trajectory]
+    ys = [p[0][1] for p in trajectory]
 
     plt.figure(figsize=(10,5))
     plt.scatter(xs,ys,color="red",s=30,label="Ball detections",zorder=3)
@@ -57,8 +67,8 @@ def plot_trajectory(trajectory,pitch_start_x=200,
 def process_video(path, show=False):
     frame_count = 0
     prev_circle = None
-    euclidean_dist: float = lambda x1,y1,x2,y2: (x1-x2)**2 + (y1-y2)**2
-    trajectory: list[(int,int)] | list[(float,float)]= []
+    euclidean_dist: float = lambda x1,y1,x2,y2: ((x1-x2)**2 + (y1-y2)**2)**0.5
+    trajectory: list[(int,int),int] | list[(float,float),int]= []
 
     print("video processing begun")
     video = capture_video(path)
@@ -69,10 +79,11 @@ def process_video(path, show=False):
     print("Video imported into processor")
 
     kernel = np.ones((3,3))
-    stop_counter = 0
-    while stop_counter < 1:
+    stop_counter = False
+    while stop_counter == False:
         ret, frame = video.read()
         if not ret: break
+        frame_count += 1
         frame = cv.resize(frame,(1920,1080))
 
         grey_frame = cv.cvtColor(frame,cv.COLOR_BGR2GRAY)
@@ -99,17 +110,14 @@ def process_video(path, show=False):
                     # increment stop_counter. Break when stop_counter > 3, reset if false
                     # further right = chosen[x] > prev[x], chosen[y] < prev[y]
                     if (chosen[0] > prev_circle[0]):
-                        stop_counter += 1
-                    else:
-                        stop_counter = 0
-            if chosen is not None:
-                trajectory.append((int(chosen[0]),int(chosen[1])))
+                        stop_counter = True
+            if chosen is not None and not stop_counter:
+                trajectory.append(((int(chosen[0]),int(chosen[1])),frame_count))
                 cv.circle(img = frame, center = (chosen[0],chosen[1]), radius=1, color=(0,100,100),thickness=3)
                 cv.circle(frame,(chosen[0],chosen[1]),chosen[2],(255,0,255),3)
                 if prev_circle is not None:
                     cv.line(frame,(prev_circle[0],prev_circle[1]),(chosen[0],chosen[1]),(255,255,0), 3)
                 prev_circle = chosen
-        frame_count += 1
         cv.namedWindow("Detections",cv.WINDOW_NORMAL)
         cv.resizeWindow("Detections",640,360)
         if show: cv.imshow("Detections",frame)
@@ -117,16 +125,19 @@ def process_video(path, show=False):
         if cv.waitKey(1) & 0xFF == ord("q"): break
     if len(trajectory) < 5:
         return None
+    trajectory = convert_to_metres(trajectory)
     plot_trajectory(trajectory)
     video.release()
     cv.destroyAllWindows()
     print(trajectory)
-    return trajectory
+    return Delivery(trajectory)
 
 if __name__ == "__main__":
-    path = "data/29_08_26/IMG_8158.MOV"
-    trajectory = process_video(path,True)
-    if trajectory is not None:
-        print("Success")
-    else:
-        print("Detection inadequate to calculate trajectory")
+    path = "data/29_08_26/IMG_8158(5).MOV"
+    if os.path.isfile(path):
+        trajectory = process_video(path,True)
+        if trajectory is not None:
+            print(trajectory.speed)
+            print("Success")
+        else:
+            print("Detection inadequate to calculate trajectory")
