@@ -51,19 +51,55 @@ def plot_trajectory(trajectory,pitch_length=12.0):
     xs = [p[0][0] for p in trajectory]
     ys = [p[0][1] for p in trajectory]
 
-    plt.figure(figsize=(10,5))
-    plt.scatter(xs,ys,color="red",s=30,label="Ball detections",zorder=3)
-    plt.plot(xs,ys,color="blue",linestyle="--",alpha=0.7,label="Delivery Trajectory")
+    y_min = min(ys)
 
-    plt.xlim(0.0,pitch_length)
-    plt.ylim(0.0,3.0)
+    #get the minimum y-value for to find the bounce
+    bounce_point = None
+    for i in range(len(trajectory)):
+        p = trajectory[i]
+        if p[0][1] == y_min:
+            bounce_point = i
+    print(y_min)
+    print(bounce_point)
+    if bounce_point < len(trajectory)-1:
+        pre_bounce = [trajectory[i] for i in range(len(trajectory)) if i <= bounce_point]
+        pre_xs = [p[0][0] for p in pre_bounce]
+        pre_ys = [p[0][1] for p in pre_bounce]
+        post_bounce = [trajectory[i] for i in range(len(trajectory)) if i > bounce_point]
+        post_xs = [p[0][0] for p in post_bounce]
+        post_ys = [p[0][1] for p in post_bounce]
+        print(trajectory)
+        print(pre_bounce)
+        print(post_bounce)
 
-    plt.title("Delivery Trajectory")
-    plt.xlabel("Horizontal distance(metres)")
-    plt.ylabel("Height")
-    plt.grid(True,linestyle=":",alpha=0.6)
-    plt.legend()
-    plt.show()
+        pre_poly = np.poly1d(np.polyfit(pre_xs,pre_ys,2))
+        post_poly = np.poly1d(np.polyfit(post_xs,post_ys,2))
+        print(pre_poly)
+        print(post_poly)
+
+        pre_xp = np.linspace(min(pre_xs),max(pre_xs),100)
+        post_xp = np.linspace(min(post_xs),max(post_xs),100)
+
+        pre_yp = pre_poly(pre_xp)
+        post_yp = post_poly(post_xp)
+
+        plt.figure(figsize=(10,5))
+        plt.scatter(xs,ys,color="red",s=30,label="Ball detections",zorder=3)
+        plt.plot(pre_xp, pre_yp, color="blue", linestyle="--", alpha=0.7, label="Delivery Trajectory")
+        plt.plot(post_xp, post_yp, color="blue", linestyle="--", alpha=0.7)
+        #plt.plot(post_xp,post_poly(post_xp),color="blue",linestyle="--",alpha=0.7,label="Delivery Trajectory")
+
+        plt.xlim(0.0,pitch_length)
+        plt.ylim(0.0,3.0)
+
+        plt.title("Delivery Trajectory")
+        plt.xlabel("Horizontal distance(metres)")
+        plt.ylabel("Height")
+        plt.grid(True,linestyle=":",alpha=0.6)
+        plt.legend()
+        plt.show()
+    else:
+        print("No detected bounce")
 
 def process_video(path, show=False):
     frame_count = 0
@@ -74,7 +110,7 @@ def process_video(path, show=False):
     print("video processing begun")
     video, fps = capture_video(path)
 
-    background_image = find_background_image(video)
+    background_image = cv.flip(find_background_image(video),1)
     print("Background found")
 
     print("Video imported into processor")
@@ -84,6 +120,7 @@ def process_video(path, show=False):
     while stop_counter == False:
         ret, frame = video.read()
         if not ret: break
+        frame = cv.flip(frame, 1)
         frame_count += 1
         frame = cv.resize(frame,(1920,1080))
 
@@ -110,7 +147,7 @@ def process_video(path, show=False):
                     # if chosen circle is further to the right and upwards than prev_circle,
                     # increment stop_counter. Break when stop_counter > 3, reset if false
                     # further right = chosen[x] > prev[x], chosen[y] < prev[y]
-                    if (chosen[0] > prev_circle[0]):
+                    if (chosen[0] < prev_circle[0]):
                         stop_counter = True
             if chosen is not None and not stop_counter:
                 trajectory.append(((int(chosen[0]),int(chosen[1])),frame_count))
@@ -134,7 +171,7 @@ def process_video(path, show=False):
 
 if __name__ == "__main__":
     init_db()
-    path = "data/29_08_26"
+    path = "data/29_08_26/IMG_8158(9).MOV"
     if os.path.isfile(path):
         delivery = process_video(path,True)
         if delivery is not None:
