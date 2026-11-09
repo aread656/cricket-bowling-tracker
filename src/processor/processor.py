@@ -3,9 +3,11 @@ import numpy as np
 from matplotlib import pyplot as plt
 import os
 from delivery import Delivery
-from db import save_delivery_to_db, init_db
+import db as db
 
-def capture_video(path:str) -> cv.VideoCapture:
+def capture_video(path:str) -> tuple[cv.VideoCapture, float] | None:
+    if not os.path.exists(path):
+        return None
     print("video capture begun")
     video = cv.VideoCapture(path)
     print("Video Captured")
@@ -33,7 +35,7 @@ def background_subtraction(image,background):
     _, segmented_image = cv.threshold(image_difference,30,255,cv.THRESH_BINARY)
     return segmented_image
 
-def convert_to_metres(trajectory, pitch_start_x=200, pitch_end_x=1920,pitch_length=12.0):
+def convert_to_metres(trajectory, pitch_start_x=200, pitch_end_x=1920,pitch_length=12.0) -> list[float]:
     pixels_to_metres_scale_factor: float = (pitch_length/abs(pitch_end_x-pitch_start_x))
     # iterate over all coordinate tuples in trajectory list
     # change each x & y value into metres
@@ -46,7 +48,7 @@ def convert_to_metres(trajectory, pitch_start_x=200, pitch_end_x=1920,pitch_leng
         new_trajectory.append(((new_x,new_y),frame))
     return new_trajectory
 
-def plot_trajectory(trajectory,pitch_length=12.0):
+def plot_trajectory(trajectory,path:str,pitch_length=12.0) -> None:
 
     xs = [p[0][0] for p in trajectory]
     ys = [p[0][1] for p in trajectory]
@@ -59,8 +61,7 @@ def plot_trajectory(trajectory,pitch_length=12.0):
         p = trajectory[i]
         if p[0][1] == y_min:
             bounce_point = i
-    print(y_min)
-    print(bounce_point)
+
     if bounce_point < len(trajectory)-1:
         pre_bounce = [trajectory[i] for i in range(len(trajectory)) if i <= bounce_point]
         pre_xs = [p[0][0] for p in pre_bounce]
@@ -68,14 +69,9 @@ def plot_trajectory(trajectory,pitch_length=12.0):
         post_bounce = [trajectory[i] for i in range(len(trajectory)) if i > bounce_point]
         post_xs = [p[0][0] for p in post_bounce]
         post_ys = [p[0][1] for p in post_bounce]
-        print(trajectory)
-        print(pre_bounce)
-        print(post_bounce)
 
         pre_poly = np.poly1d(np.polyfit(pre_xs,pre_ys,2))
         post_poly = np.poly1d(np.polyfit(post_xs,post_ys,2))
-        print(pre_poly)
-        print(post_poly)
 
         pre_xp = np.linspace(min(pre_xs),max(pre_xs),100)
         post_xp = np.linspace(min(post_xs),max(post_xs),100)
@@ -87,7 +83,6 @@ def plot_trajectory(trajectory,pitch_length=12.0):
         plt.scatter(xs,ys,color="red",s=30,label="Ball detections",zorder=3)
         plt.plot(pre_xp, pre_yp, color="blue", linestyle="--", alpha=0.7, label="Delivery Trajectory")
         plt.plot(post_xp, post_yp, color="blue", linestyle="--", alpha=0.7)
-        #plt.plot(post_xp,post_poly(post_xp),color="blue",linestyle="--",alpha=0.7,label="Delivery Trajectory")
 
         plt.xlim(0.0,pitch_length)
         plt.ylim(0.0,3.0)
@@ -101,7 +96,7 @@ def plot_trajectory(trajectory,pitch_length=12.0):
     else:
         print("No detected bounce")
 
-def process_video(path, show=False):
+def process_video(path, show=False) -> Delivery:
     frame_count = 0
     prev_circle = None
     euclidean_dist: float = lambda x1,y1,x2,y2: ((x1-x2)**2 + (y1-y2)**2)**0.5
@@ -163,30 +158,34 @@ def process_video(path, show=False):
         if cv.waitKey(1) & 0xFF == ord("q"): break
     if len(trajectory) < 5:
         return None
-    trajectory = convert_to_metres(trajectory)
-    if show: plot_trajectory(trajectory)
+    trajectory: list[float] = convert_to_metres(trajectory)
+    if show: plot_trajectory(trajectory,path)
     video.release()
     cv.destroyAllWindows()
     return Delivery(trajectory,fps)
 
 if __name__ == "__main__":
-    init_db()
-    path = "data/29_08_26/IMG_8158(9).MOV"
+    db.init_db()
+    path = "data/29_08_26/IMG_8158(2).MOV"
     if os.path.isfile(path):
+        print(db.get_delivery_by_path(path))
+        print(db.get_delivery_by_id(2))
         delivery = process_video(path,True)
         if delivery is not None:
             print(delivery)
-            save_delivery_to_db(delivery,path)
+            db.save_delivery_to_db(delivery,path)
             print("Success")
         else:
             print("Detection inadequate to calculate trajectory")
     elif os.path.isdir(path):
         files = [entry.path for entry in os.scandir(path) if os.path.isfile(entry)]
         for file in files:
-            delivery = process_video(file,False)
+            delivery = process_video(file)
             if delivery is not None:
                 print(delivery)
-                save_delivery_to_db(delivery,file)
+                db.save_delivery_to_db(delivery,file)
                 print("Success")
             else:
                 print("Detection inadequate to calculate trajectory")
+    else:
+        print("Invalid path")

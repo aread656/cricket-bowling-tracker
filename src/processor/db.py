@@ -1,5 +1,6 @@
 import sqlite3 as sql
 from delivery import Delivery
+import json
 
 # define connection and cursor
 connection = sql.connect('cricket_tracker.db')
@@ -67,3 +68,20 @@ def save_delivery_to_db(delivery:Delivery, path: str):
     VALUES (?,?,?,?)""", points)
     
     connection.commit()
+def get_delivery_by_path(path:str):
+    cursor.execute("SELECT * FROM deliveries WHERE path = ?",(path,))
+    return cursor.fetchone()
+def get_delivery_by_id(id:int):
+    cursor.execute("SELECT * FROM deliveries WHERE delivery_id = ?",(id,))
+    return cursor.fetchone()
+def delivery_record_into_JSON(record):
+    if record is None:
+        print("Invalid record")
+        return None
+    return {
+        "id":record.delivery_id,
+        "path":record.path,
+        "speed":record.speed,
+        "run_up":record.run_up,
+        "distance":record.distance
+    }
