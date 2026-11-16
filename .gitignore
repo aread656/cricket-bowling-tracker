@@ -6,3 +6,6 @@ settings.json
 *.sqlite
 *.sqlite3
 *.md
+.gocache
+src/server/uploads
+*.exe
