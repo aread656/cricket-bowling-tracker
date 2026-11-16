@@ -1,8 +1,11 @@
 import sqlite3 as sql
 from delivery import Delivery
+import os
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__),"..",".."))
+DB_PATH = os.path.join(ROOT_DIR,"cricket_tracker.db")
 
 # define connection and cursor
-connection = sql.connect('cricket_tracker.db')
+connection = sql.connect(DB_PATH)
 cursor = connection.cursor()
 
 def init_db():
@@ -75,20 +78,3 @@ def get_delivery_by_path(path:str):
 def get_delivery_by_id(id:int):
     cursor.execute("SELECT * FROM deliveries WHERE delivery_id = ?",(id,))
     return cursor.fetchone()
-"""def deliveries_into_json(dels: list[Delivery]):
-    #open up the dictionary
-    #nest dictionaries, one for each delivery
-    #iterate through each delivery and append each in format to JSON
-    #return JSON with opening and closing brackets
-    records = []
-    for d in dels:
-        if d is not None:
-            d_rec = get_delivery_by_path(d.path)
-            records.append({
-                "id":d_rec.delivery_id,
-                "path":d_rec.path,
-                "speed":d_rec.speed,
-                "run_up":d_rec.run_up,
-                "distance":d_rec.distance
-            })
-    return json.dumps(records)"""
