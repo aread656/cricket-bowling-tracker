@@ -172,7 +172,7 @@ def process_path(path:str) -> list[tuple[int,Delivery]] | None:
             delivery = process_video(path,True)
             if delivery is not None:
                 print(delivery,file=sys.stderr)
-                delivery_id = db.save_delivery_to_db(delivery,path)
+                delivery_id = db.save_delivery_to_db(delivery)
                 print("Success",file=sys.stderr)
                 deliveries.append((delivery_id,delivery))
                 return deliveries
