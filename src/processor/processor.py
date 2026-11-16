@@ -153,9 +153,11 @@ def process_video(path, show=False) -> Delivery:
                 if prev_circle is not None:
                     cv.line(frame,(prev_circle[0],prev_circle[1]),(chosen[0],chosen[1]),(255,255,0), 3)
                 prev_circle = chosen
-        cv.namedWindow("Detections",cv.WINDOW_NORMAL)
-        cv.resizeWindow("Detections",640,360)
-        if show: cv.imshow("Detections",frame)
+        
+        if show: 
+            cv.namedWindow("Detections",cv.WINDOW_NORMAL)
+            cv.resizeWindow("Detections",640,360)
+            cv.imshow("Detections",frame)
 
         if cv.waitKey(1) & 0xFF == ord("q"): break
     if len(trajectory) < 5:
@@ -169,7 +171,7 @@ def process_video(path, show=False) -> Delivery:
 def process_path(path:str) -> list[tuple[int,Delivery]] | None:
     deliveries: list[tuple[int,Delivery]] = []
     if os.path.isfile(path):
-            delivery = process_video(path,True)
+            delivery = process_video(path)
             if delivery is not None:
                 print(delivery,file=sys.stderr)
                 delivery_id = db.save_delivery_to_db(delivery)
