@@ -13,7 +13,7 @@ import (
 	"runtime"
 )
 
-func projectRoot() (string, error) {
+func project_root() (string, error) {
 	_, source, _, ok := runtime.Caller(0)
 	if !ok {
 		return "", fmt.Errorf("could not locate server source file")
@@ -46,7 +46,7 @@ func save_video(w http.ResponseWriter, r *http.Request) {
 	header.Filename = filepath.Base(header.Filename)
 	defer src.Close()
 
-	root, err := projectRoot()
+	root, err := project_root()
 	if err != nil {
 		http.Error(w, "Could not locate project directory", http.StatusInternalServerError)
 		return
@@ -82,47 +82,44 @@ func save_video(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "File %v has been saved", header.Filename)
 }
 
-func analyse_video(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
-	var request struct {
+func analyse_video(w http.ResponseWriter, r *http.Request){
+	r.Body = http.MaxBytesReader(w,r.Body,1<<20)
+	var request struct{
 		Filename string `json:"filename"`
 	}
 	decoder := json.NewDecoder(r.Body)
-	if err := decoder.Decode(&request); err != nil {
-		http.Error(w, "Invalid JSON request", http.StatusBadRequest)
+	if err := decoder.Decode(&request); err != nil{
+		http.Error(w,"Invalid JSON Request",http.StatusBadRequest)
 		return
 	}
-	if _, err := decoder.Token(); err != io.EOF {
-		http.Error(w, "Request must contain one JSON value", http.StatusBadRequest)
+	if _, err := decoder.Token(); err != io.EOF{
+		http.Error(w,"JSON object must comtain at least one value",http.StatusBadRequest)
 		return
 	}
-	if request.Filename == "" || filepath.Base(request.Filename) != request.Filename || request.Filename == "." {
-		http.Error(w, "filename must be a plain uploaded filename", http.StatusBadRequest)
+	if request.Filename == "" || request.Filename == "." || filepath.Base(request.Filename) != request.Filename{
+		http.Error(w,"Filename must be a plain filename",http.StatusBadRequest)
 		return
 	}
-
-	root, err := projectRoot()
-	if err != nil {
-		http.Error(w, "Could not locate project directory", http.StatusInternalServerError)
+	root,err := project_root()
+	if err != nil{
+		http.Error(w,"Couldn't locate root directory",http.StatusInternalServerError)
 		return
 	}
-	uploadPath := filepath.Join(root, "src", "server", "uploads", request.Filename)
-	if info, err := os.Stat(uploadPath); err != nil || !info.Mode().IsRegular() {
-		http.Error(w, "Uploaded video not found", http.StatusNotFound)
+	upload_path := filepath.Join(root,"src","server","uploads",request.Filename)
+	if info, err := os.Stat(upload_path); err != nil || !info.Mode().IsRegular(){
+		http.Error(w,"Selected file has not been uploaded",http.StatusInternalServerError)
 		return
 	}
-	processorPath := filepath.Join(root, "src", "processor", "processor.py")
-	cmd := exec.Command("python", processorPath, uploadPath)
-
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-
+	processor_path := filepath.Join(root,"src","processor","processor.py")
+	cmd := exec.Command("python",processor_path,upload_path)
+	var stdErr bytes.Buffer
+	cmd.Stderr = &stdErr
 	output, err := cmd.Output()
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Processing failed: %v\n%s", err, stderr.String()), http.StatusInternalServerError)
+	if err != nil{
+		http.Error(w,fmt.Sprintf("Error occurred during processing: %v\n%v\n",err,stdErr.String()),http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type","application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(output)
 }
