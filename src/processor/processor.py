@@ -4,15 +4,17 @@ from matplotlib import pyplot as plt
 import os
 from delivery import Delivery
 import db as db
+import sys
+import json
 
 def capture_video(path:str) -> tuple[cv.VideoCapture, float] | None:
     if not os.path.exists(path):
         return None
-    print("video capture begun")
+    print("video capture begun",file=sys.stderr)
     video = cv.VideoCapture(path)
-    print("Video Captured")
+    print("Video Captured",file=sys.stderr)
     fps = video.get(cv.CAP_PROP_FPS)
-    print("Actual video FPS:", fps)
+    print("Actual video FPS:", fps,file=sys.stderr)
     video.set(cv.CAP_PROP_POS_FRAMES,0)
     return video, fps
 
@@ -25,7 +27,7 @@ def hsv_mask(img):
 def find_background_image(vid:cv.VideoCapture):
     ret, background = vid.read()
     if not ret:
-        print("No background image. Check file exists, and method called before other processing")
+        print("No background image. Check file exists, and method called before other processing",file=sys.stderr)
         return
     return cv.resize(background,(1920,1080))
 
@@ -94,21 +96,21 @@ def plot_trajectory(trajectory,path:str,pitch_length=12.0) -> None:
         plt.legend()
         plt.show()
     else:
-        print("No detected bounce")
+        print("No detected bounce",file=sys.stderr)
 
 def process_video(path, show=False) -> Delivery:
     frame_count = 0
     prev_circle = None
-    euclidean_dist: float = lambda x1,y1,x2,y2: ((x1-x2)**2 + (y1-y2)**2)**0.5
+    euclidean_dist: float = lambda x1,y1,x2,y2: ((float(x1)-float(x2))**2 + (float(y1)-float(y2))**2)**0.5
     trajectory: list[(int,int),int] | list[(float,float),int]= []
 
-    print("video processing begun")
+    print("video processing begun",file=sys.stderr)
     video, fps = capture_video(path)
 
     background_image = cv.flip(find_background_image(video),1)
-    print("Background found")
+    print("Background found",file=sys.stderr)
 
-    print("Video imported into processor")
+    print("Video imported into processor",file=sys.stderr)
 
     kernel = np.ones((3,3))
     stop_counter = False
@@ -162,30 +164,51 @@ def process_video(path, show=False) -> Delivery:
     if show: plot_trajectory(trajectory,path)
     video.release()
     cv.destroyAllWindows()
-    return Delivery(trajectory,fps)
+    return Delivery(path,trajectory,fps)
 
-if __name__ == "__main__":
-    db.init_db()
-    path = "data/29_08_26/IMG_8158(2).MOV"
+def process_path(path:str) -> list[tuple[int,Delivery]] | None:
+    deliveries: list[tuple[int,Delivery]] = []
     if os.path.isfile(path):
-        print(db.get_delivery_by_path(path))
-        print(db.get_delivery_by_id(2))
-        delivery = process_video(path,True)
-        if delivery is not None:
-            print(delivery)
-            db.save_delivery_to_db(delivery,path)
-            print("Success")
-        else:
-            print("Detection inadequate to calculate trajectory")
+            delivery = process_video(path,True)
+            if delivery is not None:
+                print(delivery,file=sys.stderr)
+                delivery_id = db.save_delivery_to_db(delivery,path)
+                print("Success",file=sys.stderr)
+                deliveries.append((delivery_id,delivery))
+                return deliveries
+            else:
+                print("Detection inadequate to calculate trajectory",file=sys.stderr)
     elif os.path.isdir(path):
         files = [entry.path for entry in os.scandir(path) if os.path.isfile(entry)]
         for file in files:
             delivery = process_video(file)
             if delivery is not None:
-                print(delivery)
-                db.save_delivery_to_db(delivery,file)
-                print("Success")
+                print(delivery,file=sys.stderr)
+                delivery_id = db.save_delivery_to_db(delivery,file)
+                print("Success",file=sys.stderr)
+                deliveries.append((delivery_id,delivery))
             else:
-                print("Detection inadequate to calculate trajectory")
+                print("Detection inadequate to calculate trajectory",file=sys.stderr)
+        return deliveries
     else:
-        print("Invalid path")
+        print("Invalid path",file=sys.stderr)
+    return None
+
+def export_deliveries_json(dels: list[tuple[int,Delivery]]):
+    records = []
+    for d in dels:
+        records.append({
+            "id":d[0],
+            "path":d[1].path,
+            "speed":d[1].speed,
+            "run_up":d[1].run_up,
+            "distance":d[1].distance
+        })
+    return json.dumps(records)
+
+if __name__ == "__main__":
+    db.init_db()
+    path = sys.argv[1] if len(sys.argv) > 1 else ""
+    deliveries = process_path(path)
+    if deliveries is not None:
+        print(export_deliveries_json(deliveries))
