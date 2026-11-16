@@ -1,6 +1,5 @@
 import sqlite3 as sql
 from delivery import Delivery
-import json
 
 # define connection and cursor
 connection = sql.connect('cricket_tracker.db')
@@ -59,6 +58,7 @@ def save_delivery_to_db(delivery:Delivery, path: str):
         cursor.execute("""INSERT INTO deliveries 
         (trajectory_id, path, run_up, distance, speed) VALUES (?,?,?,?,?)""",
         (trajectory_id, path, delivery.run_up, delivery.distance, delivery.speed),)
+        delivery_id = cursor.lastrowid
         
     # format & insert trajectory points values
     points = [(trajectory_id, point[0][0], point[0][1], point[1])
@@ -66,22 +66,29 @@ def save_delivery_to_db(delivery:Delivery, path: str):
     cursor.executemany("""INSERT INTO 
     trajectory_points (trajectory_id,x,y,t) 
     VALUES (?,?,?,?)""", points)
-    
     connection.commit()
+    return delivery_id
+
 def get_delivery_by_path(path:str):
     cursor.execute("SELECT * FROM deliveries WHERE path = ?",(path,))
     return cursor.fetchone()
 def get_delivery_by_id(id:int):
     cursor.execute("SELECT * FROM deliveries WHERE delivery_id = ?",(id,))
     return cursor.fetchone()
-def delivery_record_into_JSON(record):
-    if record is None:
-        print("Invalid record")
-        return None
-    return {
-        "id":record.delivery_id,
-        "path":record.path,
-        "speed":record.speed,
-        "run_up":record.run_up,
-        "distance":record.distance
-    }
+"""def deliveries_into_json(dels: list[Delivery]):
+    #open up the dictionary
+    #nest dictionaries, one for each delivery
+    #iterate through each delivery and append each in format to JSON
+    #return JSON with opening and closing brackets
+    records = []
+    for d in dels:
+        if d is not None:
+            d_rec = get_delivery_by_path(d.path)
+            records.append({
+                "id":d_rec.delivery_id,
+                "path":d_rec.path,
+                "speed":d_rec.speed,
+                "run_up":d_rec.run_up,
+                "distance":d_rec.distance
+            })
+    return json.dumps(records)"""
