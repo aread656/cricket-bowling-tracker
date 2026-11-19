@@ -124,6 +124,16 @@ func analyse_video(w http.ResponseWriter, r *http.Request){
 	w.Write(output)
 }
 
+func enableCORS(w http.ResponseWriter, r *http.Request){
+	w.Header().Set("Access-Control-Allow-Origin","http://localhost:5173")
+	w.Header().Set("Access-Control-Allow-Methods","GET,POST,OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers","Content-Type")
+	if r.Method=="OPTIONS"{
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+}
+
 func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, r *http.Request) {
@@ -132,5 +142,10 @@ func main() {
 	mux.HandleFunc("POST /api/videos", get_video)
 	mux.HandleFunc("POST /api/save", save_video)
 	mux.HandleFunc("POST /api/analyse", analyse_video)
-	log.Fatal(http.ListenAndServe(":8081", mux))
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		enableCORS(w, r)
+		if r.Method == "OPTIONS" {return}
+		mux.ServeHTTP(w, r)
+	})
+	log.Fatal(http.ListenAndServe(":8080", handler))
 }
