@@ -1,6 +1,8 @@
-import {useState} from "react"
-function UploadDelivery(){
-    const [file,setFile] = useState<File|null>(null)
+interface UploadDeliveryProps{
+    file:File|null
+    setFile: React.Dispatch<React.SetStateAction<File|null>>
+}
+function UploadDelivery({file,setFile}:UploadDeliveryProps){
     return (
     <section id="analyse">
         <div className="analyse">
@@ -11,7 +13,6 @@ function UploadDelivery(){
                 setFile(event.target.files?.[0] ?? null)
             }}/>
             <p>{file?.name ?? "No file selected"}</p>
-            <button type="button">Analyse Video</button>
         </div>
       </section>
     )
