@@ -1,17 +1,22 @@
+import {useState} from "react"
+
 interface UploadDeliveryProps{
     file:File|null
     setFile: React.Dispatch<React.SetStateAction<File|null>>
 }
 interface SaveDeliveryProps {
     file: File|null
+    session: string
+    onSaved: (upload: {filename:string; session:string}|null) => void
 }
 
-async function SaveDelivery({file}:SaveDeliveryProps){
+async function SaveDelivery({file,session,onSaved}:SaveDeliveryProps){
     const url = "http://localhost:8080/api/save";
-    if (file == null){return "Video could not be saved"}
+    if (file == null){onSaved(null); return}
     try{
         const formData = new FormData()
-        formData.append("video",file)
+        formData.append("video",file,file.name)
+        formData.append("session",session)
         const response = await fetch(url,{
             method:"POST",
             body:formData
@@ -19,17 +24,19 @@ async function SaveDelivery({file}:SaveDeliveryProps){
         const msg = await response.text();
         if (!response.ok){
             console.log(`Response message: ${response.status}, ${msg}`)
-            return null;
+            onSaved(null); return null;
         }
-        console.log(msg);
-        return msg;
+        const upload = JSON.parse(msg) as {filename:string;session:string}
+        onSaved(upload)
+        return upload;
     }catch(error){
         console.error(error)
-        return null
+        onSaved(null); return null
     }
 }
 
-function UploadDelivery({file,setFile}:UploadDeliveryProps){
+function UploadDelivery({file,setFile,onSaved}:UploadDeliveryProps & {onSaved:(upload:{filename:string;session:string}|null)=>void}){
+    const [session,setSession] = useState("")
     return (
     <section id="upload">
         <div className="upload">
@@ -39,9 +46,14 @@ function UploadDelivery({file,setFile}:UploadDeliveryProps){
             onChange={(event)=>{
                 const selected = event.target.files?.[0] ?? null
                 setFile(selected)
-                SaveDelivery({file:selected})
+                onSaved(null)
             }}/>
             <p>{file?.name ?? "No file selected"}</p>
+            <label htmlFor="session">Session date/folder: </label>
+            <input type="text" id="session" value={session} placeholder="e.g. 2026-11-20"
+            onChange={(event)=>{setSession(event.target.value); onSaved(null)}}/>
+            <button type="button" disabled={!file || !session.trim()}
+            onClick={()=>SaveDelivery({file,session:session.trim(),onSaved})}>Save upload</button>
         </div>
       </section>
     )

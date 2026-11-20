@@ -2,7 +2,7 @@ import os
 
 class Delivery:
     def __init__(self,path,trajectory,fps: float,run_up: int = 0,distance: int = 0):
-        self.path = os.path.basename(path)
+        self.path = path
         self.trajectory = trajectory
         self.fps = fps
         self.run_up = run_up

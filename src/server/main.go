@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 )
 
 func project_root() (string, error) {
@@ -36,14 +37,21 @@ func get_video(w http.ResponseWriter, r *http.Request) {
 }
 
 func save_video(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/plain")
+	w.Header().Set("Content-Type", "application/json")
 	src, header, err := r.FormFile("video")
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintf(w, "Error: %v", err)
 		return
 	}
-	header.Filename = filepath.Base(header.Filename)
+	filename := filepath.Base(strings.ReplaceAll(header.Filename, "\\", "/"))
+	session := strings.TrimSpace(r.FormValue("session"))
+	if filename == "" || filename == "." || filename == ".." || session == "" || session == "." || session == ".." || strings.ContainsAny(session, `/\\`) {
+		http.Error(w, "A filename and session date/folder are required", http.StatusBadRequest)
+		return
+	}
+	fmt.Println("Session: " + session)
+	fmt.Println("Filename: " + filename)
 	defer src.Close()
 
 	root, err := project_root()
@@ -51,12 +59,12 @@ func save_video(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Could not locate project directory", http.StatusInternalServerError)
 		return
 	}
-	uploadDir := filepath.Join(root, "src", "server", "uploads")
+	uploadDir := filepath.Join(root, "src", "server", "uploads",session)
 	if err := os.MkdirAll(uploadDir, 0755); err != nil {
 		http.Error(w, "Could not prepare upload directory", http.StatusInternalServerError)
 		return
 	}
-	path := filepath.Join(uploadDir, header.Filename)
+	path := filepath.Join(uploadDir, filename)
 	dst, err := os.Create(path)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -79,13 +87,14 @@ func save_video(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, "File %v has been saved", header.Filename)
+	_ = json.NewEncoder(w).Encode(map[string]string{"filename": filename, "session": session})
 }
 
 func analyse_video(w http.ResponseWriter, r *http.Request){
 	r.Body = http.MaxBytesReader(w,r.Body,1<<20)
 	var request struct{
 		Filename string `json:"filename"`
+		Session string `json:"session"`
 	}
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&request); err != nil{
@@ -96,7 +105,7 @@ func analyse_video(w http.ResponseWriter, r *http.Request){
 		http.Error(w,"JSON object must comtain at least one value",http.StatusBadRequest)
 		return
 	}
-	if request.Filename == "" || request.Filename == "." || filepath.Base(request.Filename) != request.Filename{
+	if request.Filename == "" || request.Filename == "." || filepath.Base(request.Filename) != request.Filename || request.Session == "" || request.Session == "." || filepath.Base(request.Session) != request.Session {
 		http.Error(w,"Filename must be a plain filename",http.StatusBadRequest)
 		return
 	}
@@ -105,7 +114,7 @@ func analyse_video(w http.ResponseWriter, r *http.Request){
 		http.Error(w,"Couldn't locate root directory",http.StatusInternalServerError)
 		return
 	}
-	upload_path := filepath.Join(root,"src","server","uploads",request.Filename)
+	upload_path := filepath.Join(root,"src","server","uploads",request.Session,request.Filename)
 	if info, err := os.Stat(upload_path); err != nil || !info.Mode().IsRegular(){
 		http.Error(w,"Selected file has not been uploaded",http.StatusInternalServerError)
 		return

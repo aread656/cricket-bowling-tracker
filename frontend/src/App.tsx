@@ -5,6 +5,7 @@ import AnalyseVideo from "./analyse"
 
 function App(){
   const [file,setFile] = useState<File|null>(null)
+  const [upload,setUpload] = useState<{filename:string;session:string}|null>(null)
   return (
     <main className="app-shell">
       <header className="topbar">
@@ -26,10 +27,10 @@ function App(){
             <p>Choose a clip from your device to begin.</p>
           </div>
         </div>
-        <UploadForm file={file} setFile={setFile}/>
+        <UploadForm file={file} setFile={setFile} onSaved={setUpload}/>
         <div className="workflow-footer">
           <p className="helper-text">A clear side-on or front-on view works best.</p>
-          <AnalyseVideo file={file}/>
+          <AnalyseVideo file={file} upload={upload}/>
         </div>
       </section>
 

@@ -37,9 +37,10 @@ def init_db():
 
     connection.commit()
 
-def save_delivery_to_db(delivery:Delivery):
+def save_delivery_to_db(delivery:Delivery, path=None):
 
-    cursor.execute("SELECT delivery_id,trajectory_id FROM deliveries WHERE path = ?", (delivery.path,))
+    path = path or delivery.path
+    cursor.execute("SELECT delivery_id,trajectory_id FROM deliveries WHERE path = ?", (path,))
     existing_record = cursor.fetchone()
 
     if existing_record is not None:
@@ -60,7 +61,7 @@ def save_delivery_to_db(delivery:Delivery):
         # format & insert delivery values
         cursor.execute("""INSERT INTO deliveries 
         (trajectory_id, path, run_up, distance, speed) VALUES (?,?,?,?,?)""",
-        (trajectory_id, delivery.path, delivery.run_up, delivery.distance, delivery.speed),)
+	        (trajectory_id, path, delivery.run_up, delivery.distance, delivery.speed),)
         delivery_id = cursor.lastrowid
         
     # format & insert trajectory points values

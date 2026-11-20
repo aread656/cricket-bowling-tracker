@@ -200,6 +200,7 @@ def export_deliveries_json(dels: list[tuple[int,Delivery]]):
     records = []
     for d in dels:
         records.append({
+            "session":os.path.basename(os.path.dirname(d[1].path)),
             "id":d[0],
             "path":d[1].path,
             "speed":d[1].speed,

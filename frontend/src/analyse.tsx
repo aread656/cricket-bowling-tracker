@@ -1,8 +1,9 @@
 interface analyseProps{
     file:File|null
+    upload: {filename:string;session:string}|null
 }
 
-async function GetVideo({file}:analyseProps){
+async function GetVideo({upload}:analyseProps){
     const url = "http://localhost:8080/api/analyse";
     try{
         const response = await fetch(url,{
@@ -10,7 +11,7 @@ async function GetVideo({file}:analyseProps){
             headers:{
                 "Content-Type":"application/json"
             },
-            body:JSON.stringify({filename:file?.name})
+            body:JSON.stringify(upload)
         });
         if (!response.ok){
             const msg = await response.text()
@@ -24,16 +25,15 @@ async function GetVideo({file}:analyseProps){
     }
 }
 
-function AnalyseVideo({file}:analyseProps){
+function AnalyseVideo({file,upload}:analyseProps){
     return (
     <button
         className="analyse-button"
-        disabled={file === null}
+        disabled={file === null || upload === null}
         type="button"
         onClick = {()=>{
-            if (file !== null){
-                console.log(file.name)
-                GetVideo({file}).then(result=>{
+            if (file !== null && upload !== null){
+                GetVideo({file,upload}).then(result=>{
                     console.log(result)
                 })
             }else{
