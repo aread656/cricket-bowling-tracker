@@ -50,8 +50,6 @@ func save_video(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "A filename and session date/folder are required", http.StatusBadRequest)
 		return
 	}
-	fmt.Println("Session: " + session)
-	fmt.Println("Filename: " + filename)
 	defer src.Close()
 
 	root, err := project_root()

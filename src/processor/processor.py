@@ -166,7 +166,9 @@ def process_video(path, show=False) -> Delivery:
     if show: plot_trajectory(trajectory,path)
     video.release()
     cv.destroyAllWindows()
-    return Delivery(path,trajectory,fps)
+    # Keep machine-specific upload roots out of saved delivery records.
+    stored_path = os.path.join(os.path.basename(os.path.dirname(path)), os.path.basename(path))
+    return Delivery(stored_path,trajectory,fps)
 
 def process_path(path:str) -> list[tuple[int,Delivery]] | None:
     deliveries: list[tuple[int,Delivery]] = []
@@ -186,7 +188,7 @@ def process_path(path:str) -> list[tuple[int,Delivery]] | None:
             delivery = process_video(file)
             if delivery is not None:
                 print(delivery,file=sys.stderr)
-                delivery_id = db.save_delivery_to_db(delivery,file)
+                delivery_id = db.save_delivery_to_db(delivery)
                 print("Success",file=sys.stderr)
                 deliveries.append((delivery_id,delivery))
             else:
@@ -202,7 +204,7 @@ def export_deliveries_json(dels: list[tuple[int,Delivery]]):
         records.append({
             "session":os.path.basename(os.path.dirname(d[1].path)),
             "id":d[0],
-            "path":d[1].path,
+            "path":d[1].path.replace(os.sep, "/"),
             "speed":d[1].speed,
             "run_up":d[1].run_up,
             "distance":d[1].distance

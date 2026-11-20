@@ -28,6 +28,7 @@ async function SaveDelivery({file,session,onSaved}:SaveDeliveryProps){
         }
         const upload = JSON.parse(msg) as {filename:string;session:string}
         onSaved(upload)
+        console.log("Saved video: "+upload.session+"/"+upload.filename)
         return upload;
     }catch(error){
         console.error(error)
@@ -46,6 +47,7 @@ function UploadDelivery({file,setFile,onSaved}:UploadDeliveryProps & {onSaved:(u
             onChange={(event)=>{
                 const selected = event.target.files?.[0] ?? null
                 setFile(selected)
+                console.log("Uploaded file: " + selected?.name)
                 onSaved(null)
             }}/>
             <p>{file?.name ?? "No file selected"}</p>
@@ -53,7 +55,8 @@ function UploadDelivery({file,setFile,onSaved}:UploadDeliveryProps & {onSaved:(u
             <input type="text" id="session" value={session} placeholder="e.g. 2026-11-20"
             onChange={(event)=>{setSession(event.target.value); onSaved(null)}}/>
             <button type="button" disabled={!file || !session.trim()}
-            onClick={()=>SaveDelivery({file,session:session.trim(),onSaved})}>Save upload</button>
+            onClick={()=>
+                SaveDelivery({file,session:session.trim(),onSaved})}>Save upload</button>
         </div>
       </section>
     )
