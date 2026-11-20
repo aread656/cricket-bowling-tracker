@@ -17,7 +17,6 @@ async function GetVideo({file}:analyseProps){
             throw new Error(`Response status: ${response.status}: ${msg}`);
         }
         const result = await response.json();
-        console.log(result);
         return result
     }catch (error){
         console.error(error);
@@ -28,6 +27,8 @@ async function GetVideo({file}:analyseProps){
 function AnalyseVideo({file}:analyseProps){
     return (
     <button
+        className="analyse-button"
+        disabled={file === null}
         type="button"
         onClick = {()=>{
             if (file !== null){
@@ -40,7 +41,7 @@ function AnalyseVideo({file}:analyseProps){
             }
         }}>
         
-    Analyse Video</button>
+    <span aria-hidden="true">↗</span> Analyse video</button>
     )
 }
 export default AnalyseVideo
